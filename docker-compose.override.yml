@@ -1,0 +1,116 @@
+# docker-compose.yml
+version: '3.8'
+
+services:
+  # Web API
+  api:
+    image: ${DOCKER_REGISTRY-}netcore8commandpatternapplication
+    build:
+      context: .
+      dockerfile: src/NetCore8.CommandPattern.Application/Dockerfile
+    environment:
+      - ASPNETCORE_ENVIRONMENT=Development
+      - ASPNETCORE_URLS=http://+:5000
+      - ConnectionStrings__DefaultConnection=Server=sqlserver;Database=CommandPatternDb;User Id=sa;Password=YourStrong@Passw0rd;TrustServerCertificate=True
+      - ConnectionStrings__Redis=redis:6379,password=YourStrongRedisPassword
+    ports:
+      - "5000:5000"
+    depends_on:
+      - sqlserver
+      - redis
+    networks:
+      - command-pattern-network
+    volumes:
+      - dataprotection-keys:/app/keys
+
+  # SQL Server
+  sqlserver:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    environment:
+      - ACCEPT_EULA=Y
+      - SA_PASSWORD=YourStrong@Passw0rd
+    ports:
+      - "1433:1433"
+    volumes:
+      - sqlserver_data:/var/opt/mssql
+    networks:
+      - command-pattern-network
+    healthcheck:
+      test: /opt/mssql-tools/bin/sqlcmd -S localhost -U sa -P "YourStrong@Passw0rd" -Q "SELECT 1" -b -1
+      interval: 10s
+      timeout: 3s
+      retries: 3
+
+  # Redis
+  redis:
+    image: redis:alpine
+    command: redis-server --requirepass YourStrongRedisPassword
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - command-pattern-network
+    healthcheck:
+      test: redis-cli ping
+      interval: 5s
+      timeout: 3s
+      retries: 3
+
+  # Redis Commander (Redis UI)
+  redis-commander:
+    image: rediscommander/redis-commander:latest
+    environment:
+      - REDIS_HOSTS=local:redis:6379:0:YourStrongRedisPassword
+    ports:
+      - "8081:8081"
+    networks:
+      - command-pattern-network
+    depends_on:
+      - redis
+
+  # Prometheus
+  prometheus:
+    image: prom/prometheus:latest
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
+    networks:
+      - command-pattern-network
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/usr/share/prometheus/console_libraries'
+      - '--web.console.templates=/usr/share/prometheus/consoles'
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  # Grafana
+  grafana:
+    image: grafana/grafana:latest
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+      - GF_USERS_ALLOW_SIGN_UP=false
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./grafana/provisioning:/etc/grafana/provisioning
+    networks:
+      - command-pattern-network
+    depends_on:
+      - prometheus
+
+volumes:
+  sqlserver_data:
+  redis_data:
+  prometheus_data:
+  grafana_data:
+  dataprotection-keys:
+
+networks:
+  command-pattern-network:
+    driver: bridge

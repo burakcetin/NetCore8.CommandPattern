@@ -1,0 +1,6 @@
+services:
+  netcore8.commandpattern.application:
+    image: ${DOCKER_REGISTRY-}netcore8commandpatternapplication
+    build:
+      context: .
+      dockerfile: src/NetCore8.CommandPattern.Application/Dockerfile
