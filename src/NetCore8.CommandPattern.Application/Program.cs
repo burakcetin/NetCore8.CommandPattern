@@ -14,7 +14,31 @@ using StackExchange.Redis;
 using System.Text;
 using Microsoft.AspNetCore.DataProtection;
 using StackExchange.Redis;
+using Serilog;
+using Serilog.Events;
+using Serilog.Sinks.Grafana.Loki;
 var builder = WebApplication.CreateBuilder(args);
+
+var lokiLabels = new[]
+{
+    new LokiLabel { Key = "app", Value = "command-pattern" },
+    new LokiLabel { Key = "environment", Value = "development" },
+    new LokiLabel { Key = "host", Value = Environment.MachineName }
+};
+
+Log.Logger = new LoggerConfiguration()
+    .MinimumLevel.Debug()
+    .MinimumLevel.Override("Microsoft", LogEventLevel.Information)
+    .Enrich.FromLogContext()
+    .Enrich.WithMachineName()
+    .Enrich.WithThreadId()
+    .Enrich.WithProcessId()
+    .WriteTo.Console(
+        outputTemplate: "[{Timestamp:HH:mm:ss} {Level:u3}] {Message:lj} {Properties:j}{NewLine}{Exception}")
+    .WriteTo.GrafanaLoki("http://loki:3100", lokiLabels)
+    .CreateLogger();
+
+builder.Host.UseSerilog();
 
 // Redis connection
 var redisConnectionString = builder.Configuration.GetConnectionString("Redis") + ",abortConnect=false";

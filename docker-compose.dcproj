@@ -18,6 +18,7 @@
     <None Include="grafana\provisioning\dashboards\command-pattern.json" />
     <None Include="grafana\provisioning\dashboards\dashboard.yml" />
     <None Include="grafana\provisioning\datasources\datasource.yml" />
+    <None Include="promtail-config.yml" />
     <None Include="prometheus.yml" />
   </ItemGroup>
 </Project>
